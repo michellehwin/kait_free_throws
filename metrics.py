@@ -5,6 +5,7 @@ from matplotlib import pyplot as plt
 np.set_printoptions(threshold=np.inf)
 import traceback 
 import time
+import src.utils as utils
 
 
 import math
@@ -46,34 +47,41 @@ def main():
 
     # -------------------- All Players ------------------------
 
-    data_export = globals.MN_data_export
-    player_list = globals.MN_player_list 
+    in_folder = '/Volumes/michsand256/kait_data/BALL DATA - UTFE'
+    player_list = []
+    for folder in os.listdir(in_folder):
+        if os.path.isdir(f'{in_folder}/{folder}'):
+            player_list.append(folder)
     
     df_list = []
 
     for i in range (len(player_list)):
-
         player = player_list[i]
-
-        player_files = [x for x in os.listdir(f'{globals.data_path}/{data_export}/{data_export}/{player}') if 'FT' in x]
-        print(player_files)
+        print('player',player)
+        player_files = []
+        for file in os.listdir(f'{in_folder}/{player}'):
+            if 'FT' in file and '.csv' in file and file[:2] != '._':
+                player_files.append(f"{in_folder}/{player}/{file}")
 
         rows = []
         for f in player_files:
 
             print(f'-------- {f} --------')
             
-            row = metrics(data_export, f'{globals.data_path}/{data_export}/{data_export}/{player}/{f}')
+            row = utils.metrics('out', f)
             rows.append(row)
 
+        if len(rows) == 0:
+            continue
         df_metrics = pd.DataFrame(rows)
 
-        df_metrics.to_csv(f'{globals.metrics_path}/{player}/{player}_metrics.csv', index=False)
+        os.makedirs(f'metrics/{player}', exist_ok=True)
+        df_metrics.to_csv(f'metrics/{player}/{player}_metrics.csv', index=False)
 
         df_list.append(df_metrics)
 
     df_final = pd.concat(df_list)
-    df_final.to_csv(f'{globals.metrics_path}/{player_list[0][0:4]}_metrics.csv', index=False)
+    df_final.to_csv(f'metrics/{player_list[0][0:4]}_metrics.csv', index=False)
 
     print("--- %s seconds ---" % (time.time() - start_time))
 
