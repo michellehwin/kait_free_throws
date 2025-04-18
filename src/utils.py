@@ -5,7 +5,7 @@ import numpy.polynomial.polynomial as poly
 from matplotlib import pyplot as plt
 np.set_printoptions(threshold=np.inf)
 import traceback 
-
+import os
 import itertools
 import math
 from statistics import mean
@@ -13,7 +13,7 @@ from statistics import stdev
 
 import sys
 
-import globals
+from src import globals
 
 
 
@@ -21,9 +21,7 @@ import globals
 
 
 def read_raw_data(data_export, file_name):
-
-
-    if data_export == globals.FE_data_export:
+    if globals.FE_data_export in file_name:
 
         player = file_name.split('/')[6][:-11]
 
@@ -50,7 +48,7 @@ def read_raw_data(data_export, file_name):
 
         return df
     
-    elif data_export == globals.MN_data_export:
+    elif globals.MN_data_export in file_name:
 
         player = file_name.split('/')[6][:-11]
 
@@ -63,6 +61,16 @@ def read_raw_data(data_export, file_name):
         df = df[globals.column_names_alt_2]
 
         return df
+
+    elif 'UTWN' in file_name:
+        player = file_name[file_name.find('/UTWN'):]
+        df = pd.read_csv(file_name, skiprows=6)
+        col_list = list(df.columns)[0:2] + list(df.columns)[370:373] + list(df.columns[373:391])
+        col_name_mapper = dict(zip(col_list, globals.column_names_alt_2))
+        df = df.rename(col_name_mapper, axis=1)
+        df = df[globals.column_names_alt_2]
+        return df
+
     
     elif data_export == globals.TR_FEB_23_data_export:
 
@@ -108,8 +116,12 @@ def progressbar(it, prefix="", size=60, file=sys.stdout):
 
 
 def convert_m_to_ft(x):
-
+    # mm to feet
     return (x / 1000) * 3.28084
+
+def convert_mm_to_in(x):
+    # mm to inches
+    return x * 0.0393701
 
 
 ######################################################### estimation functions ########################################################
@@ -462,7 +474,7 @@ def find_rim_coords(data_export, file_name):
 
     df = read_raw_data(data_export, file_name)
 
-    if data_export == globals.FE_data_export:
+    if globals.FE_data_export in file_name:
 
         rim_marker_1_x = df['Rim:Marker001_Position_X'].mean()
         rim_marker_1_y = df['Rim:Marker001_Position_Z'].mean()
@@ -529,9 +541,9 @@ def find_rim_coords(data_export, file_name):
 
         return rim_coords_x, rim_coords_y, rim_coords_z, radius
     
-    elif data_export == globals.MN_data_export:
+    elif globals.MN_data_export in file_name or 'UTWN' in file_name:
 
-        # find rim center
+        # for each marker (1-6), find the average x, y, z coordinates
         rim_marker_1_x = df['Rim:Marker001_Position_X'].mean()
         rim_marker_1_y = df['Rim:Marker001_Position_Z'].mean()
         rim_marker_1_z = df['Rim:Marker001_Position_Y'].mean()
@@ -583,15 +595,13 @@ def find_rim_coords(data_export, file_name):
         rim_coords_list_y = []
         radius_list = []
 
-        # for elem in itertools.combinations([1,2,3,4,5,6], 3):
-
-        #     print(elem)
-
         keep_comb = [[1, 2, 3], [1, 2, 5], [1, 3, 4],
                      [1, 3, 5], [1, 3, 6], [1, 4, 6],
                      [2, 3, 5], [3, 4, 6]]
 
 
+        # generate a list of where rim center could be based on the combinations of the markers
+        # for each combination of 3 markers, find the center of the circle and radius
         for elem in itertools.combinations(rim_marker_list, 3):
             comb_cur = [(rim_marker_list.index(elem[0]) + 1), (rim_marker_list.index(elem[1]) + 1), (rim_marker_list.index(elem[2]) + 1)]
             if comb_cur in keep_comb:
@@ -626,10 +636,11 @@ def sweet_spot_angle(x_poly, y_poly, rim_coords_x, rim_coords_y):
     Ry = y_poly[0]
     Rx = x_poly[0]
 
+    # line from sweetspot to release point?
     ss_dy = Cy - Ry
     ss_dx = Cx - Rx
 
-    theta = math.degrees(math.atan(ss_dy/ss_dx))
+    theta = math.degrees(math.atan(ss_dx/ss_dy))
 
     return theta
 
@@ -657,17 +668,21 @@ def sweet_spot_coords(x_poly, y_poly, rim_coords_x, rim_coords_y, theta):
 def metrics(data_export, file_name):
 
     df = read_raw_data(data_export, file_name)
+    if df is None:
+        return
 
-    player = file_name.split('/')[6][:-11]
-    shot_att = file_name.split('/')[6][:-4]
+    player = file_name[file_name.find('/UT') + 1: file_name.find('/UT') + 7]
+    print('player:', player)
+    shot_att = file_name[file_name.find('.csv') - 6: -4]
+    print('shot:', shot_att)
 
     print('-------- Dropping Duplicates ----------')
 
-    print(len(df))
+    print('before drop dup',len(df))
 
     df = df.drop_duplicates(subset=['Ball_Position_X', 'Ball_Position_Y', 'Ball_Position_Z'])
 
-    print(len(df))
+    print('after drop dup',len(df))
 
     x_pos_array = df['Ball_Position_X'].apply(lambda x: convert_m_to_ft(x)).to_numpy() 
     y_pos_array = df['Ball_Position_Z'].apply(lambda x: convert_m_to_ft(x)).to_numpy()
@@ -676,6 +691,7 @@ def metrics(data_export, file_name):
     frame_seq = df['Frame'].to_numpy()
     
 
+    # calc diff between each frame and remove the ones that are too far apart
     diffs = np.abs(np.diff(x_pos_array, prepend=0, append=0))
     keep_idx = np.where((diffs[:-1] <= 5) | (diffs[1:] <= 5))[0]
     x_pos_array = x_pos_array[keep_idx]
@@ -717,9 +733,9 @@ def metrics(data_export, file_name):
 
     good_stop = False
     stop = -1
-    for j in range(start, len(z_pos_array)-1):
+    for j in range(start, len(y_pos_array) - 5):
 
-        # check if it hit the back board and bounced back, stop it before it hits the back borad
+        # check if it hit the back board and bounced back, stop it before it hits the back board
 
         if (y_pos_array[j + 1] < y_pos_array[j]) and (y_pos_array[j + 2] < y_pos_array[j + 1]) and (y_pos_array[j + 3] < y_pos_array[j + 2]) and (y_pos_array[j + 4] < y_pos_array[j + 3]) and (j > z_apex):
             print('bounced backwards ----------')
@@ -744,8 +760,8 @@ def metrics(data_export, file_name):
     if not (good_start and good_stop):
         print('BAD DATA - Check Graph')
 
-    print(frame_start)
-    print(frame_stop)
+    print('frame start',frame_start)
+    print('frame stop',frame_stop)
 
    
     t = time_seq[start:stop] - time_seq[start]
@@ -757,9 +773,11 @@ def metrics(data_export, file_name):
 
     df_ts_dict = {'t': fitted_t, 'x': fitted_x, 'y': fitted_y, 'z': fitted_z}
 
+    # this df is just the ball data?
     df_ts = pd.DataFrame(df_ts_dict)
-
-    df_ts.to_csv(f'../timeseries/{data_export[-4:]}/{player}/{shot_att}_TS.csv', index=False)
+    # print('folder:', f'{data_export}/{player}')
+    os.makedirs(f'{data_export}/{player}', exist_ok=True)
+    df_ts.to_csv(f'{data_export}/{player}/{shot_att}_TS.csv', index=False)
 
     params_x, cov_x = curve_fit(fit_x, t, x)
     params_y, cov_y = curve_fit(fit_y, t, y)
@@ -782,8 +800,8 @@ def metrics(data_export, file_name):
     sweet_spot_angle_value_poly = sweet_spot_angle(fitted_x, fitted_y, rim_coords_x, rim_coords_y)
     Sx_poly, Sy_poly = sweet_spot_coords(fitted_x, fitted_y, rim_coords_x, rim_coords_y, sweet_spot_angle_value_poly)
 
-    print(sweet_spot_angle_value_poly)
-    print(Sx_poly, Sy_poly)
+    print('sweet_spot_angle_value_poly',sweet_spot_angle_value_poly)
+    print('Sx_poly:',Sx_poly,'Sy_poly:', Sy_poly)
 
     params['sweet_spot_pm'] = [Sx_pm, Sy_pm, rim_coords_z]
     params['sweet_spot_poly'] = [Sx_poly, Sy_poly, fitted_z[-1]]
@@ -816,7 +834,7 @@ def metrics(data_export, file_name):
     parameters['release_v_mag_poly'] = release_velocity(fitted_x, fitted_y, fitted_z, fitted_t)
     parameters['launch_angle_pm'] = 90 - np.arccos(parameters['vz'] / parameters['release_v_mag_pm']) * 180 / np.pi
     parameters['launch_angle_poly'] = release_angle(fitted_x, fitted_y, fitted_z)
-    parameters['off_center_angle_pm'] = np.arctan(parameters['vy'] / parameters['vx']) * 180 / np.pi
+    parameters['off_center_angle_pm'] = np.arctan(parameters['vx'] / parameters['vy']) * 180 / np.pi
     parameters['off_center_angle_poly'] = sweet_spot_angle_value_poly
     parameters['vz_f'] = parameters['vz'] - parameters['az'] * parameters['entry_t_pm']
     parameters['entry_angle_pm'] = np.arctan(parameters['vz_f'] / parameters['release_v_mag_pm']) * 180 / np.pi
