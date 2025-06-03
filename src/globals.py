@@ -3,12 +3,12 @@ import os
 # sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../"))
 
 
-data_path = sys.path[0] + 'data'
+data_path = '/Volumes/michsand256/kait_data/'
 graph_path = sys.path[0] + 'graphs'
 metrics_path = sys.path[0] + 'metrics'
 
 
-
+WN_data_export = 'BALL DATA - UTWN'
 
 FE_data_export = 'BALL DATA - UTFE'
 

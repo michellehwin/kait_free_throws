@@ -13,10 +13,8 @@ from statistics import stdev
 
 import sys
 import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
-
-from utils import *
-import globals
+from src.utils import *
+import src.globals
 
 
 
@@ -26,11 +24,13 @@ def main():
 
     # ---------------- 1 Player -----------------------
 
-    data_export = globals.MN_data_export
+    data_export = 'out'
     player_num = 9
-    player = globals.MN_player_list[player_num]
+    category = 'UTMN'
+    player = 'UTWN04'
+    # player = globals.MN_player_list[player_num]
 
-    player_files = [x for x in os.listdir(f'{globals.data_path}/{data_export}/{data_export}/{player}') if 'FT' in x]
+    player_files = [x for x in os.listdir(f'{data_export}/{player}') if 'FT' in x]
     print(player_files)
 
     for f in player_files:
@@ -39,7 +39,7 @@ def main():
 
         att = f.split('_')[2][:-4]
 
-        graph_shot_player_pm(data_export, player, att, f'{globals.data_path}/{data_export}/{data_export}/{player}/{f}')
+        graph_shot_player(data_export, player, att, f'{data_export}/{player}/{f}')
 
 
     # ---------------- All Players ----------------------

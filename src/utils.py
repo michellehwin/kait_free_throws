@@ -21,6 +21,7 @@ from src import globals
 
 
 def read_raw_data(data_export, file_name):
+    print('reading raw data', file_name)
     if globals.FE_data_export in file_name:
 
         player = file_name.split('/')[6][:-11]
@@ -138,7 +139,9 @@ def fit_z(t, vz, z0, az):
 
 
 def arc_coordinates(x, y, z, t):
-
+    '''
+    x, y, z: x, y, z coordinates of the ball in INCHES
+    '''
     fitted_x = []
     fitted_y = []
     fitted_z = []
@@ -159,7 +162,7 @@ def arc_coordinates(x, y, z, t):
     for i in range(len(t_extended)):
 
         cur_z = poly.polyval(t_extended[i], coeffs_z)
-        cur_diff_z = abs(cur_z - 10)
+        cur_diff_z = abs(cur_z - (10 * 12))
 
         if cur_diff_z < diff_z:
             diff_z = cur_diff_z
@@ -336,6 +339,10 @@ def entry_direction(Rx, Ry, Ex, Ey, Cx, Cy):
     return direction
 
 def left_right(Rx, Ry, Ex, Ey, Cx, Cy, direction):
+    # Rx, Ry is the starting x, y of the fitted path
+    # Ex, Ey is x, y of entry point
+    # Cx, Cy is the center of the rim
+    # return units is INCHES
 
     # Cy = globals.center_of_rim_coords[1]
     # Cx = globals.center_of_rim_coords[0]
@@ -346,20 +353,23 @@ def left_right(Rx, Ry, Ex, Ey, Cx, Cy, direction):
     # Ey = y_poly[-1]
     # Ex = x_poly[-1]
 
+    # vector from shot start to rim center
     RC_Vector = return_vector(Cx, Rx, Cy, Ry, 0, 0)
     RC_magnitude = vector_magnitude(RC_Vector)
     RC_Unit_Vector = list(unit_vector(RC_Vector, RC_magnitude))
 
+    # vector from shot start to entry point 
     RE_Vector = return_vector(Ex, Rx, Ey, Ry, 0, 0)
     RE_magnitude = vector_magnitude(RE_Vector)
     RE_Unit_Vector = list(unit_vector(RE_Vector, RE_magnitude))
 
     dot = np.dot(RE_Unit_Vector, RC_Unit_Vector)
 
+    # angle between ball actual path and ideal path
     theta = math.degrees(math.acos(dot))
 
     # print('Left Right Angle: {}'.format(theta))
-
+    # calculate lateral distance from center line
     d = math.sin(math.radians(theta)) * RE_magnitude
 
     if direction == 'Left':
@@ -470,8 +480,8 @@ def findCircle(x1, y1, x2, y2, x3, y3) :
     return [h, k], r
 
 
-def find_rim_coords(data_export, file_name):
-
+def find_rim_coords(data_export, file_name, verbose=True):
+    '''return rim coordinates in INCHES'''
     df = read_raw_data(data_export, file_name)
 
     if globals.FE_data_export in file_name:
@@ -492,17 +502,18 @@ def find_rim_coords(data_export, file_name):
         rim_marker_4_y = df['Rim:Marker004_Position_Z'].mean()
         rim_marker_4_z = df['Rim:Marker004_Position_Y'].mean()
 
-        print('\n\n----------------\n\nHOOP MARKERS:\n\n----------------\n\n')
-        print(f'MARKER 1: ({rim_marker_1_x}, {rim_marker_1_y}, {rim_marker_1_z})')
-        print(f'MARKER 2: ({rim_marker_2_x}, {rim_marker_2_y}, {rim_marker_2_z})')
-        print(f'MARKER 3: ({rim_marker_3_x}, {rim_marker_3_y}, {rim_marker_3_z})')
-        print(f'MARKER 4: ({rim_marker_4_x}, {rim_marker_4_y}, {rim_marker_4_z})')
+        if verbose:
+            print('\n\n----------------\n\nHOOP MARKERS:\n\n----------------\n\n')
+            print(f'MARKER 1: ({rim_marker_1_x}, {rim_marker_1_y}, {rim_marker_1_z})')
+            print(f'MARKER 2: ({rim_marker_2_x}, {rim_marker_2_y}, {rim_marker_2_z})')
+            print(f'MARKER 3: ({rim_marker_3_x}, {rim_marker_3_y}, {rim_marker_3_z})')
+            print(f'MARKER 4: ({rim_marker_4_x}, {rim_marker_4_y}, {rim_marker_4_z})')
 
         # rim_coords_list_z = [rim_marker_1_z, rim_marker_4_z]
         # rim_coords_z = convert_m_to_ft(mean(rim_coords_list_z))
         # print(rim_coords_z)
 
-        rim_coords_z = 10
+        rim_coords_z = 10 * 12
 
         rim_coords_list_x = []
         rim_coords_list_y = []
@@ -529,15 +540,15 @@ def find_rim_coords(data_export, file_name):
         radius_list.append(r)
 
 
-        rim_coords_x = convert_m_to_ft(mean(rim_coords_list_x))
-        print(rim_coords_x)
+        rim_coords_x = convert_mm_to_in(mean(rim_coords_list_x))
+        # print(rim_coords_x)
 
-        rim_coords_y = convert_m_to_ft(mean(rim_coords_list_y))
-        print(rim_coords_y)
+        rim_coords_y = convert_mm_to_in(mean(rim_coords_list_y))
+        # print(rim_coords_y)
 
         # radius = convert_m_to_ft(mean(radius_list))
-        radius = .75
-        print(radius)
+        radius = .75 * 12
+        # print(radius)
 
         return rim_coords_x, rim_coords_y, rim_coords_z, radius
     
@@ -568,13 +579,14 @@ def find_rim_coords(data_export, file_name):
         rim_marker_6_y = df['Rim:Marker006_Position_Z'].mean()
         rim_marker_6_z = df['Rim:Marker006_Position_Y'].mean()
 
-        print('\n\n----------------\n\nHOOP MARKERS:\n\n----------------\n\n')
-        print(f'MARKER 1: ({rim_marker_1_x}, {rim_marker_1_y}, {rim_marker_1_z})')
-        print(f'MARKER 2: ({rim_marker_2_x}, {rim_marker_2_y}, {rim_marker_2_z})')
-        print(f'MARKER 3: ({rim_marker_3_x}, {rim_marker_3_y}, {rim_marker_3_z})')
-        print(f'MARKER 4: ({rim_marker_4_x}, {rim_marker_4_y}, {rim_marker_4_z})')
-        print(f'MARKER 5: ({rim_marker_5_x}, {rim_marker_5_y}, {rim_marker_5_z})')
-        print(f'MARKER 6: ({rim_marker_6_x}, {rim_marker_6_y}, {rim_marker_6_z})')
+        if verbose:
+            print('\n\n----------------\n\nHOOP MARKERS:\n\n----------------\n\n')
+            print(f'MARKER 1: ({rim_marker_1_x}, {rim_marker_1_y}, {rim_marker_1_z})')
+            print(f'MARKER 2: ({rim_marker_2_x}, {rim_marker_2_y}, {rim_marker_2_z})')
+            print(f'MARKER 3: ({rim_marker_3_x}, {rim_marker_3_y}, {rim_marker_3_z})')
+            print(f'MARKER 4: ({rim_marker_4_x}, {rim_marker_4_y}, {rim_marker_4_z})')
+            print(f'MARKER 5: ({rim_marker_5_x}, {rim_marker_5_y}, {rim_marker_5_z})')
+            print(f'MARKER 6: ({rim_marker_6_x}, {rim_marker_6_y}, {rim_marker_6_z})')
 
         rim_marker_1_list = [rim_marker_1_x, rim_marker_1_y, rim_marker_1_z]
         rim_marker_2_list = [rim_marker_2_x, rim_marker_2_y, rim_marker_2_z]
@@ -589,7 +601,8 @@ def find_rim_coords(data_export, file_name):
         # rim_coords_z = convert_m_to_ft(mean(rim_coords_list_z))
         # print(rim_coords_z)
 
-        rim_coords_z = 10
+        # the height of the rim is 10ft
+        rim_coords_z = 10 * 12
 
         rim_coords_list_x = []
         rim_coords_list_y = []
@@ -605,63 +618,79 @@ def find_rim_coords(data_export, file_name):
         for elem in itertools.combinations(rim_marker_list, 3):
             comb_cur = [(rim_marker_list.index(elem[0]) + 1), (rim_marker_list.index(elem[1]) + 1), (rim_marker_list.index(elem[2]) + 1)]
             if comb_cur in keep_comb:
-                print(f'P{(rim_marker_list.index(elem[0]) + 1)}: {elem[0]}')
-                print(f'P{(rim_marker_list.index(elem[1]) + 1)}: {elem[1]}')
-                print(f'P{(rim_marker_list.index(elem[2]) + 1)}: {elem[2]}')
+                if verbose:
+                    print(f'P{(rim_marker_list.index(elem[0]) + 1)}: {elem[0]}')
+                    print(f'P{(rim_marker_list.index(elem[1]) + 1)}: {elem[1]}')
+                    print(f'P{(rim_marker_list.index(elem[2]) + 1)}: {elem[2]}')
                 coords, r = findCircle(elem[0][0], elem[0][1], elem[1][0], elem[1][1], elem[2][0], elem[2][1])
                 rim_coords_list_x.append(coords[0])
                 rim_coords_list_y.append(coords[1])
                 radius_list.append(r)
             else:
                 continue
+        
+        # to get rim center, take the average of the x and y coordinates
+        rim_coords_x = convert_mm_to_in(mean(rim_coords_list_x))
+        if verbose:
+            print(rim_coords_x)
 
-        rim_coords_x = convert_m_to_ft(mean(rim_coords_list_x))
-        print(rim_coords_x)
-
-        rim_coords_y = convert_m_to_ft(mean(rim_coords_list_y))
-        print(rim_coords_y)
+        rim_coords_y = convert_mm_to_in(mean(rim_coords_list_y))
+        if verbose:
+            print(rim_coords_y)
 
         # radius = convert_m_to_ft(mean(radius_list))
-        radius = .75
-        print(radius)
+        radius = .75 * 12
 
         return rim_coords_x, rim_coords_y, rim_coords_z, radius
 
 
 def sweet_spot_angle(x_poly, y_poly, rim_coords_x, rim_coords_y):
 
+    # rim center coordinates
     Cy = rim_coords_y
     Cx = rim_coords_x
-
+    
+    # first point of ball trajectory
     Ry = y_poly[0]
     Rx = x_poly[0]
 
-    # line from sweetspot to release point?
-    ss_dy = Cy - Ry
-    ss_dx = Cx - Rx
+    ss_dy = Cy - Ry # draw a parallel line to the sideline starting from
+    # the rim center and extending to y of ball release
+    ss_dx = Cx - Rx # draw a parallel line to the baseline starting from
+    # the rim center and extending to x of ball release
 
+    # theta is the angle between the two lines
     theta = math.degrees(math.atan(ss_dx/ss_dy))
 
     return theta
 
 def sweet_spot_coords(x_poly, y_poly, rim_coords_x, rim_coords_y, theta):
 
+    # rim center coordinates
     Cy = rim_coords_y
     Cx = rim_coords_x
+    # print(f'Rim Center: ({Cx}, {Cy})')
 
+    # first point of ball trajectory
     Ry = y_poly[0]
     Rx = x_poly[0]
 
-    dx = math.cos(math.radians(theta)) * 0.1666667
-    dy = math.sin(math.radians(theta)) * 0.1666667
+    
+    dy = math.cos(math.radians(theta)) * 0.1666667 * 12
+    dx = math.sin(math.radians(theta)) * 0.1666667 * 12
+    # print(f'dx, dy: {dx}, {dy}')
 
     if Rx > Cx:
-        Sx = Cx - dx
-        Sy = Cy - dy
-    else:
+        # release point is to the right of the rim center
+        # so the sweet spot should? be to the left of the rim center
         Sx = Cx + dx
         Sy = Cy + dy
+    else:
+        # release point is to the left of the rim center
+        Sx = Cx - dx
+        Sy = Cy + dy
 
+    # print(f'Sweet Spot: ({Sx}, {Sy})')
     return Sx, Sy
 
 
@@ -684,16 +713,16 @@ def metrics(data_export, file_name):
 
     print('after drop dup',len(df))
 
-    x_pos_array = df['Ball_Position_X'].apply(lambda x: convert_m_to_ft(x)).to_numpy() 
-    y_pos_array = df['Ball_Position_Z'].apply(lambda x: convert_m_to_ft(x)).to_numpy()
-    z_pos_array = df['Ball_Position_Y'].apply(lambda x: convert_m_to_ft(x)).to_numpy()
+    x_pos_array = df['Ball_Position_X'].apply(lambda x: convert_mm_to_in(x)).to_numpy() 
+    y_pos_array = df['Ball_Position_Z'].apply(lambda x: convert_mm_to_in(x)).to_numpy()
+    z_pos_array = df['Ball_Position_Y'].apply(lambda x: convert_mm_to_in(x)).to_numpy()
     time_seq = df['Time'].to_numpy()
     frame_seq = df['Frame'].to_numpy()
     
 
     # calc diff between each frame and remove the ones that are too far apart
     diffs = np.abs(np.diff(x_pos_array, prepend=0, append=0))
-    keep_idx = np.where((diffs[:-1] <= 5) | (diffs[1:] <= 5))[0]
+    keep_idx = np.where((diffs[:-1] <= 5*12) | (diffs[1:] <= 5*12))[0]
     x_pos_array = x_pos_array[keep_idx]
     y_pos_array = y_pos_array[keep_idx]
     z_pos_array = z_pos_array[keep_idx]
@@ -701,7 +730,7 @@ def metrics(data_export, file_name):
     frame_seq = frame_seq[keep_idx]
 
     # changed it to 6ft because 5ft was causing some noise in finding the release frame
-    five_ft = np.argmax(z_pos_array > 6)
+    five_ft = np.argmax(z_pos_array > 6 * 12)
     x_pos_array = x_pos_array[five_ft:]
     y_pos_array = y_pos_array[five_ft:]
     z_pos_array = z_pos_array[five_ft:]
@@ -719,7 +748,7 @@ def metrics(data_export, file_name):
     good_start = False
     try:
         z_apex = np.argmax(z_pos_array)
-        releas_window_idx = np.where((z_pos_array > 9.9) & (z_pos_array < 10.1))
+        releas_window_idx = np.where((z_pos_array > 9.9 * 12) & (z_pos_array < 10.1 * 12))
         # start = np.argmax(v_sum_array[:z_apex])
         start = np.argmax(v_sum_array[:releas_window_idx[0][0]])
         good_start = True
@@ -743,7 +772,7 @@ def metrics(data_export, file_name):
             good_stop = True
             break
 
-        if z_pos_array[j] > 10.45 and z_pos_array[j + 1] <= 10.45:
+        if z_pos_array[j] > 10.45 * 12 and z_pos_array[j + 1] <= 10.45 * 12:
             stop = j
             good_stop = True
             break
@@ -813,11 +842,11 @@ def metrics(data_export, file_name):
     parameters['apex_y'] = parameters['release_y_pm'] + parameters['vy'] * parameters['apex_t']
     parameters['apex_z_pm'] = parameters['release_z_pm'] + parameters['vz'] * parameters['apex_t'] - 0.5 * parameters['az'] * parameters['apex_t']**2
     parameters['apex_z_poly'] = max(fitted_z)
-    parameters['entry_t_pm'] = (parameters['vz'] + np.sqrt(parameters['vz']**2 - 2 * parameters['az'] * 10 + 2 * parameters['az'] * parameters['release_z_pm'])) / parameters['az']
+    parameters['entry_t_pm'] = (parameters['vz'] + np.sqrt(parameters['vz']**2 - 2 * parameters['az'] * (10*12) + 2 * parameters['az'] * parameters['release_z_pm'])) / parameters['az']
     parameters['entry_t_poly'] = fitted_t[-1]
-    parameters['entry_x_pm'] = parameters['release_x_pm'] + parameters['vx'] * parameters['entry_t_pm']
+    parameters['entry_x_pm'] = parameters['release_x_pm'] + parameters['vx'] * parameters['entry_t_pm'] + parameters['ax'] * parameters['entry_t_pm']**2 / 2
     parameters['entry_x_poly'] = fitted_x[-1]
-    parameters['entry_y_pm'] = parameters['release_y_pm'] + parameters['vy'] * parameters['entry_t_pm']
+    parameters['entry_y_pm'] = parameters['release_y_pm'] + parameters['vy'] * parameters['entry_t_pm'] + parameters['ay'] * parameters['entry_t_pm']**2 / 2
     parameters['entry_y_poly'] = fitted_y[-1]
     parameters['entry_z_pm'] = rim_coords_z
     parameters['entry_z_poly'] = fitted_z[-1]
@@ -836,16 +865,17 @@ def metrics(data_export, file_name):
     parameters['launch_angle_poly'] = release_angle(fitted_x, fitted_y, fitted_z)
     parameters['off_center_angle_pm'] = np.arctan(parameters['vx'] / parameters['vy']) * 180 / np.pi
     parameters['off_center_angle_poly'] = sweet_spot_angle_value_poly
+    # vz_f is velocity at entry
     parameters['vz_f'] = parameters['vz'] - parameters['az'] * parameters['entry_t_pm']
-    parameters['entry_angle_pm'] = np.arctan(parameters['vz_f'] / parameters['release_v_mag_pm']) * 180 / np.pi
+    parameters['entry_angle_pm'] = math.degrees(np.arcsin(-parameters['vz_f'] / parameters['release_v_mag_pm']))
     parameters['entry_angle_poly'] = entry_angle(fitted_x, fitted_y, fitted_z)
 
     parameters['entry_direction_pm'] = entry_direction(fitted_x_pm[0], fitted_y_pm[0], parameters['entry_x_pm'], parameters['entry_y_pm'], rim_coords_x, rim_coords_y)
     parameters['entry_direction_poly'] = entry_direction(fitted_x[0], fitted_y[0], parameters['entry_x_poly'], parameters['entry_y_poly'], rim_coords_x, rim_coords_y)
-    parameters['left_right_pm'] = left_right(fitted_x_pm[0], fitted_y_pm[0], parameters['entry_x_pm'], parameters['entry_y_pm'], rim_coords_x, rim_coords_y, parameters['entry_direction_pm']) * 12
-    parameters['left_right_poly'] = left_right(fitted_x[0], fitted_y[0], parameters['entry_x_poly'], parameters['entry_y_poly'], rim_coords_x, rim_coords_y, parameters['entry_direction_poly']) * 12
-    parameters['front_back_pm'] = front_back(fitted_x_pm[0], fitted_y_pm[0], parameters['entry_x_pm'], parameters['entry_y_pm'], rim_coords_x, rim_coords_y, parameters['sweet_spot_pm'][0], parameters['sweet_spot_pm'][1]) * 12
-    parameters['front_back_poly'] = front_back(fitted_x[0], fitted_y[0], parameters['entry_x_poly'], parameters['entry_y_poly'], rim_coords_x, rim_coords_y, parameters['sweet_spot_poly'][0], parameters['sweet_spot_poly'][1]) * 12
+    parameters['left_right_pm'] = left_right(fitted_x_pm[0], fitted_y_pm[0], parameters['entry_x_pm'], parameters['entry_y_pm'], rim_coords_x, rim_coords_y, parameters['entry_direction_pm'])
+    parameters['left_right_poly'] = left_right(fitted_x[0], fitted_y[0], parameters['entry_x_poly'], parameters['entry_y_poly'], rim_coords_x, rim_coords_y, parameters['entry_direction_poly'])
+    parameters['front_back_pm'] = front_back(fitted_x_pm[0], fitted_y_pm[0], parameters['entry_x_pm'], parameters['entry_y_pm'], rim_coords_x, rim_coords_y, parameters['sweet_spot_pm'][0], parameters['sweet_spot_pm'][1])
+    parameters['front_back_poly'] = front_back(fitted_x[0], fitted_y[0], parameters['entry_x_poly'], parameters['entry_y_poly'], rim_coords_x, rim_coords_y, parameters['sweet_spot_poly'][0], parameters['sweet_spot_poly'][1])
     parameters['short_long_pm'] = short_long(parameters['front_back_pm'])
     parameters['short_long_poly'] = short_long(parameters['front_back_poly'])
     parameters['release_height_pm'] = fitted_z_pm[0]
